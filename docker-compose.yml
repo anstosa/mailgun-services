@@ -1,0 +1,18 @@
+---
+version: "3"
+services:
+  mailgun-bouncebot:
+    container_name: mailgun-bouncebot
+    image: node:10
+    user: node
+    environment:
+      - API_KEY
+      - CC
+      - HOST
+    volumes:
+      - ./:/home/node/app
+    working_dir: /home/node/app
+    ports:
+      - ${PORT}:50708
+    command: "npm start"
+    restart: unless-stopped

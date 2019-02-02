@@ -1,0 +1,22 @@
+{
+  "name": "mailgun-bouncebot",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "nodejs index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/anstosa/mailgun-bouncebot.git"
+  },
+  "author": "Ansel Santosa",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/anstosa/mailgun-bouncebot/issues"
+  },
+  "homepage": "https://github.com/anstosa/mailgun-bouncebot#readme",
+  "dependencies": {
+    "mailgun-js": "^0.22.0"
+  }
+}
