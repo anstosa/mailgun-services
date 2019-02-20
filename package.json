@@ -1,11 +1,8 @@
 {
   "name": "mailgun-bouncebot",
   "version": "1.0.0",
-  "description": "",
+  "description": "Get failure emails from Mailgun",
   "main": "index.js",
-  "scripts": {
-    "start": "nodejs index.js"
-  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/anstosa/mailgun-bouncebot.git"
