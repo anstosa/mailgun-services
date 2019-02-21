@@ -4,6 +4,8 @@ services:
   mailgun-bouncebot:
     container_name: mailgun-bouncebot
     build: .
+    volumes:
+      - ./:/opt/app
     environment:
       - API_KEY
       - CC
