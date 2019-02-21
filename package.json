@@ -14,6 +14,7 @@
   },
   "homepage": "https://github.com/anstosa/mailgun-bouncebot#readme",
   "dependencies": {
-    "mailgun-js": "^0.22.0"
+    "mailgun-js": "^0.22.0",
+    "body-parser": "^1.18.3"
   }
 }
