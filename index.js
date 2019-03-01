@@ -1,4 +1,9 @@
 const http = require('http');
+const https = require('https');
+const url = require('url');
+const fs = require('fs');
+const bodyParser = require('body-parser');
+const request = require('request');
 
 // global variables
 let mailgun;
@@ -56,6 +61,10 @@ function startServer() {
             console.log('Received Bounce');
             processBounce(request);
         }
+        if (url === '/mailinglist') {
+            console.log('Received MailingList message');
+            processMailingListMessage(request, response);
+        }
         else {
             console.error(`Unknown endpoint: ${url}`);
             status = 404;
@@ -64,6 +73,110 @@ function startServer() {
         response.end();
     }).listen(50708, () => {
         console.log('Bouncebot started!');
+    });
+}
+
+// sendMailingListError sends an error message to the original sender indicating
+// their message was unable to send. If the message had attachments, it hints
+// that their size may have been the issue.
+function sendMailingListError(req) {
+        const helpAddr = `help@${req.body["domain"]}`;
+        const attachments = JSON.parse(req.body['attachments']);
+
+        var failureMessage = `<strong>Permanently failed to send message.</strong>`;
+        if (attachments.length > 0) {
+            failureMessage += `<p>Possibly due to attachment size</p>`;
+        }
+        failureMessage += `<p>Please contact <a href="mailto:${helpAddr}">${helpAddr}</a></p>`
+
+        initMailgun(req.body["domain"]);
+        mailgun.messages().send({
+            from: `bouncebot@${req.body["domain"]}`,
+            to: req.body["From"],
+            cc: process.env.CC || '',
+            subject: `Delivery Failure: ${req.body["subject"]}`,
+            text: failureMessage.replace(/<[^>]*>/g, ''),
+            html: failureMessage
+        });
+}
+
+const parser = bodyParser.urlencoded({extended: false});
+
+// processMailingListMessage listens for notifications of a stored message. The
+// message is then modified, adding the subject prefix, adding an unsubscribe
+// link, and finally sent to the real mailing list address.
+function processMailingListMessage(req, response) {
+    parser(req, response, (error) => {
+        if (error != "") {
+            // TODO: Email me if there was an error
+        }
+
+        const mailinglistName = process.env.MAILINGLIST_NAME;
+        const mailinglistAddr = process.env.MAILINGLIST_ADDR;
+        const subjectPrefix = process.env.MAILINGLIST_SUBJECT_PREFIX;
+        const messageID = req.body["Message-Id"];
+
+        console.log(`Received an email from ${req.body["From"]} for ${mailinglistAddr} (${messageID})`);
+
+        var bodyText = `${req.body["body-plain"]}\r\n\r\nUnsubscribe from ${mailinglistName}: %mailing_list_unsubscribe_url%`
+        var bodyHTML = `
+            ${req.body["body-html"]}
+            <br>
+            <br>
+            <a href="%mailing_list_unsubscribe_url%">Click here</a> to unsubscribe from the ${mailinglistName} mailing list`
+
+        const contentMap = JSON.parse(req.body['content-id-map']);
+        const attachments = JSON.parse(req.body['attachments']);
+
+        var newAttachments = [];
+        var newInline = [];
+        attachments.forEach((attachment) => {
+            var cid; // find the cid
+            Object.keys(contentMap).some((key) => {
+                if (contentMap[key] === attachment["url"]) {
+                    cid = key.substr(1, key.length - 2);
+                    return true;
+                }
+                return false;
+            });
+
+            var newAttachment = new mailgun.Attachment({
+                data: request({
+                    url: attachment["url"],
+                    auth: {username: 'api', password: process.env.API_KEY}
+                }),
+                filename: attachment["name"],
+            })
+
+            if (cid === "") {
+                console.log("Could not find the cid");
+                newAttachments.push(newAttachment);
+            } else if (bodyHTML.includes(cid)){
+                bodyHTML = bodyHTML.replace(cid, attachment["name"]);
+                newInline.push(newAttachment);
+            } else {
+                newAttachments.push(newAttachment);
+            }
+        });
+
+        initMailgun(req.body["domain"]);
+        mailgun.messages().send({
+            from: req.body["From"],
+            to: mailinglistAddr,
+            subject: `${subjectPrefix} ${req.body["subject"]}`,
+            text: bodyText,
+            html: bodyHTML,
+            "Message-Id": req.body["Message-Id"],
+            attachment: newAttachments,
+            inline: newInline
+        }, function (error, body) {
+            if (error !== undefined) {
+                console.warn(`Failed to forward email (${messageID}): ${error}`);
+                sendMailingListError(req);
+            } else {
+                console.log(`Successfuly forwarded email (${messageID})`);
+            }
+        });
     });
 }
 
