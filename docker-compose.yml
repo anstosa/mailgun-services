@@ -1,14 +1,14 @@
 ---
 version: "3"
 services:
-  mailgun-bouncebot:
+  mailgun-services:
     labels:
       traefik.port: 50708
       traefik.frontend.rule: "Host:mailhandler.grosinger.net"
       traefik.enable: true
       traefik.frontend.headers.SSLRedirect: true
     network_mode: default
-    container_name: mailgun-bouncebot
+    container_name: mailgun-services
     build: .
     volumes:
       - ./:/opt/app
