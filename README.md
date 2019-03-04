@@ -10,7 +10,7 @@ This service provides the same functionality if you use Mailgun for your outgoin
 It exposes a webhook that you register with each of your domains.
 
 ### Service Specific Usage
-For step 4 below:
+For step 5 below:
 1. Your webhook is `https://<HOST>/bounce`
 2. Register the above webhook for the **Permanent Failure** event on your desired domains here: https://app.mailgun.com/app/webhooks
 
@@ -22,17 +22,18 @@ This service adds:
 * An optional prefix at the beginning of the email subject
 
 ### Service Specific Usage
-For step 4 below:
+For step 5 below:
 1. Your webhook is `https://<HOST>/mailinglist`
 2. [Create a new Route](https://app.mailgun.com/app/routes/new)
-3. Select **Match Recipient** and enter the address of your mailing list (e.g. `mylist@example.com`)
+3. Select **Match Recipient** and enter the `public` address of your mailing list (e.g. `mylist@example.com`)
 4. Check **Store and notify** and paste in the above webhook
 5. Check **Stop**
 6. Click **Create Route**
-7. [Create a new Route](https://app.mailgun.com/app/routes/new)
-8. Select **Match Recipient** and enter your help email (e.g. `help@example.com`)
-9. Check **Forward** and enter your email
-10. Click **Create Route**
+7. [Create a new Mailing List](https://app.mailgun.com/app/lists/new)
+8. Enter **Alias Address** as the `internal` address (e.g. `mylist-internal@example.com`)
+9. Set **Access Level** to **Read Only**
+10. Click **Add Mailing List**
+11. Manually **Add Recipient**s or **Upload** an existing list
 
 ## Requirements
 * [Docker](https://docs.docker.com/install/)
@@ -43,7 +44,8 @@ For step 4 below:
 
 1. `git clone https://github.com/anstosa/mailgun-bouncebot.git`
 2. `cd mailgun-bouncebot`
-3. `cp .env.sample .env` and follow instructions within
-4. Follow service-specific instructions above
-5. `docker-compose up -d`
-6. `docker logs mailgun-bouncebot` to view the log output and confirm that the domains you are expecting to work have a check mark next to them.
+3. `cp config.js.sample config` and follow instructions within
+4. `cp docker-compose.yml.sample docker-compose.yml` and follow instructions within
+5. Follow service-specific instructions above
+6. `docker-compose up -d`
+7. `docker logs mailgun-services` to view the log output and confirm that you have set up everything correctly in the mailgun dashboard

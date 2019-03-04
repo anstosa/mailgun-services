@@ -1,12 +1,14 @@
+const http = require('http');
 const bounce = require('./bounce.js');
-const list = require('./bounce.js');
+const list = require('./list.js');
 
-Promise.all([
-    bounce.initialize(),
-    list.initialize(),
-]).then(startServer);
+Promise.resolve()
+    .then(bounce.initialize)
+    .then(list.initialize)
+    .then(startServer)
+;
 
-// starts the webhook listener server
+// starts the webhook listener server;
 function startServer() {
     http.createServer((request, response) => {
         let status = 200;

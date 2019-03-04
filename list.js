@@ -1,27 +1,32 @@
+const _ = require('lodash');
 const bodyParser = require('body-parser');
-const initMailgun = require('./lib/init-mailgun');
-const stripHtml = require('./lib/strip-html');
+const CONFIG = require('./config').CONFIG;
+const initMailgun = require('./lib/init-mailgun').initMailgun;
 const request = require('request');
+const stripHtml = require('./lib/strip-html').stripHtml;
+
+const lists = _.get(CONFIG, ['services', 'mailinglist', 'lists'], []);
 
 // gets the list of active mailing list routes and prints their status
 module.exports.initialize = () => {
     return new Promise((resolve) => {
         console.log('Initializing list service... (Webhook installed)');
+        const mailgun = initMailgun();
         mailgun.get('/routes', (error, response) => {
             response.items.forEach(({expression, actions}) => {
                 const match = expression.match(/^match_recipient\(\"(.*)\"\)$/);
                 if (match) {
                     const recipient = match[1];
-                    const hasWebhook = (actions[0] === `store(notify="${process.env.HOST}/mailinglist")`);
+                    const hasWebhook = (actions[0] === `store(notify="${CONFIG.host}/mailinglist")`);
                     if (!hasWebhook) {
                         return;
                     }
                     const hasStop = (actions[1] === 'stop()');
-                    let status = (isConfirmed ? '✔' : '✘');
+                    let status = (hasStop ? '✔' : '✘');
                     if (!hasStop) {
                         status += ' Stop box not checked';
                     }
-                    console.log(` (${status}) ${domain}`);
+                    console.log(` (${status}) ${recipient}`);
                 }
             });
             resolve();
@@ -32,22 +37,23 @@ module.exports.initialize = () => {
 // sendMailingListError sends an error message to the original sender indicating
 // their message was unable to send. If the message had attachments, it hints
 // that their size may have been the issue.
-function sendMailingListError(req) {
-    const helpAddr = `help@${req.body.domain}`;
-    const attachments = JSON.parse(req.body.attachments);
+function sendMailingListError(list, message) {
+    const helpEmail = list.helpEmail || CONFIG.helpEmail;
+    const attachments = JSON.parse(message.attachments);
 
     const failureMessage = `
         <strong>Permanently failed to send message.</strong>
         ${(attachments.length > 0) && '<p>Possibly due to attachment size</p>'}
-        <p>Please contact <a href='mailto:${helpAddr}'>${helpAddr}</a></p>
+        ${helpEmail && (`<p>Please contact <a href='mailto:${helpEmail}'>${helpEmail}</a></p>`)}
     `;
 
-    initMailgun(req.body.domain);
+    const mailgun = initMailgun(message.domain);
     mailgun.messages().send({
-        from: `bouncebot@${req.body.domain}`,
-        to: req.body.From,
-        cc: process.env.BOUNCE_CC || '',
-        subject: `Delivery Failure: ${req.body.subject}`,
+        from: `bouncebot@${message.domain}`,
+        to: message.From,
+        cc: _.get(CONFIG, ['services', 'bounce', 'cc'], ''),
+        bcc: _.get(CONFIG, ['services', 'bounce', 'bcc'], ''),
+        subject: `Delivery Failure: ${message.subject}`,
         text: stripHtml(failureMessage),
         html: failureMessage,
     });
@@ -58,38 +64,44 @@ const parser = bodyParser.urlencoded({extended: false});
 // processMailingListMessage listens for notifications of a stored message. The
 // message is then modified, adding the subject prefix, adding an unsubscribe
 // link, and finally sent to the real mailing list address.
-module.exports.processWebhook = (req, response) {
+module.exports.processWebhook = (req, response) => {
     console.log('Received MailingList message');
     parser(req, response, (error) => {
         if (error !== '') {
             // TODO: Email me if there was an error
         }
+        const message = req.body;
+        const mailgun = initMailgun(message.domain);
 
-        const mailinglistName = process.env.MAILINGLIST_NAME;
-        const mailinglistAddr = process.env.MAILINGLIST_ADDR;
-        const subjectPrefix = process.env.MAILINGLIST_SUBJECT_PREFIX;
-        const messageID = req.body['Message-Id'];
-        const subjectParts = [req.body.subject];
-        if (subjectPrefix) {
-            subjectParts.unsift(subjectPrefix);
+        const list = _.find(lists, {public: message.recipient})
+
+        if (!list) {
+            console.error(`Mailing list ${message.recipient} not configured`);
+            return;
         }
 
-        console.log(`Received an email from ${req.body.From} for ${mailinglistAddr} (${messageID})`);
+        const messageID = message['Message-Id'];
+        const subjectParts = [message.subject];
+        if (list.subjectPrefix) {
+            subjectParts.unsift(list.subjectPrefix);
+        }
+
+        console.log(`Received an email from ${message.From} for ${list.public} (${messageID})`);
 
         const bodyText = `
-            ${req.body['body-plain']}
+            ${message['body-plain']}
 
-            Unsubscribe from ${mailinglistName}: %mailing_list_unsubscribe_url%
+            Unsubscribe from ${list.name}: %mailing_list_unsubscribe_url%
         `;
         let bodyHTML = `
-            ${req.body['body-html']}
+            ${message['body-html']}
             <br>
             <br>
-            <a href='%mailing_list_unsubscribe_url%'>Click here</a> to unsubscribe from the ${mailinglistName} mailing list
+            <a href='%mailing_list_unsubscribe_url%'>Click here</a> to unsubscribe from the ${list.name} mailing list
         `;
 
-        const contentMap = JSON.parse(req.body['content-id-map']);
-        const attachments = JSON.parse(req.body.attachments);
+        const contentMap = JSON.parse(_.get(message, ['content-id-map'], '{}'));
+        const attachments = JSON.parse(_.get(message, ['attachments'], '[]'));
 
         let newAttachments = [];
         let newInline = [];
@@ -124,20 +136,19 @@ module.exports.processWebhook = (req, response) {
             }
         });
 
-        initMailgun(req.body.domain);
         mailgun.messages().send({
-            from: req.body.From,
-            to: mailinglistAddr,
+            from: message.From,
+            to: list.internal,
             subject: subjectParts.join(' '),
             text: bodyText,
             html: bodyHTML,
-            'Message-Id': req.body['Message-Id'],
+            'Message-Id': message['Message-Id'],
             attachment: newAttachments,
             inline: newInline,
         }, (error, body) => {
             if (error) {
                 console.warn(`Failed to forward email (${messageID}): ${error}`);
-                sendMailingListError(req);
+                sendMailingListError(list, message);
             }
             else {
                 console.log(`Successfuly forwarded email (${messageID})`);

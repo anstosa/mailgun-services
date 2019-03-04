@@ -1,0 +1,34 @@
+module.exports.CONFIG = {
+    // 1. Enter your Mailgun Private API Key from here: https://app.mailgun.com/app/account/security
+    "apiKey": "key-00000000000000000000000000000000",
+    // 2. Enter your publicly accessible hostname
+    "host": "https://mailgun.example.com",
+    // 3. (optional) public help email
+    "helpEmail": "support@example.com",
+    // 4. Configure services. Everything below is optional
+    "services": {
+        "bounce": {
+            // Static CC address for all bounce notifications (including mailing lists)
+            "cc": "help@example.com",
+            // Static BCC address for all bounce notifications (including mailing lists)
+            "bcc": "help@example.com",
+        },
+        "mailinglist": {
+            "lists": [
+                {
+                    // Public address for list
+                    "public": "list@example.com",
+                    // Private mailing list configured in Mailgun
+                    // NOTE: **MUST** be different than the public address or you'll get duplicate messages
+                    "internal": "list-internal@example.com",
+                    // Human readable name for use on the email envelope
+                    "name": "My Mailing List",
+                    // Prefix to insert before the original subject
+                    "subjectPrefix": "[Mailing List]",
+                // Public help email (overrides the server default above for this list)
+                "helpEmail": "support@example.com",
+                },
+            ],
+        },
+    },
+};

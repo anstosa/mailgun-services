@@ -1,17 +1,15 @@
-const initMailgun = require('./lib/init-mailgun');
-const stripHtml = require('./lib/strip-html');
+const _ = require('lodash');
+const CONFIG = require('./config').CONFIG;
+const initMailgun = require('./lib/init-mailgun').initMailgun;
+const stripHtml = require('./lib/strip-html').stripHtml;
 
-// global variables
-let mailgun;
 const domains = {};
-
-initMailgun(process.env.DOMAIN);
-getDomains().then(startServer);
 
 // gets the list of domains and prints their status
 module.exports.initialize = () => {
     return new Promise((resolve) => {
         console.log('Initializing bounce service... (Webhook installed)');
+        const mailgun = initMailgun();
         mailgun.get('/domains', (error, response) => {
             const statuses = [];
             response.items.forEach((domain) => {
@@ -29,11 +27,11 @@ module.exports.initialize = () => {
 // determines whether the webhook is installed on a domain and prints status
 function printWebhookStatus(domain) {
     return new Promise((resolve) => {
-        initMailgun(domain);
+        const mailgun = initMailgun(domain);
         mailgun.get(`/domains/${domain}/webhooks/permanent_fail`, (error, response) => {
             if (error) { return resolve(); }
             const {urls} = response.webhook;
-            const status = urls.includes(`${process.env.HOST}/bounce`) ? '✔' : '✘';
+            const status = urls.includes(`${CONFIG.host}/bounce`) ? '✔' : '✘';
             console.log(` (${status}) ${domain}`);
             resolve();
         })
@@ -72,12 +70,13 @@ module.exports.processWebhook = (request) => {
                     ${message}
                 </blockquote>
             `;
-            initMailgun(origin);
+            const mailgun = initMailgun(origin);
             mailgun.messages().send({
                 'h:In-Reply-To': messageId,
                 from: `bouncebot@${origin}`,
                 to: sender,
-                cc: process.env.CC || '',
+                cc: _.get(CONFIG, ['services', 'bounce', 'cc'], ''),
+                bcc: _.get(CONFIG, ['services', 'bounce', 'bcc'], ''),
                 subject: `Re: ${subject}`,
                 html: failureMessage,
                 text: stripHtml(failureMessage),

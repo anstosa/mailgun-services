@@ -8,5 +8,5 @@ services:
     volumes:
       - ./:/opt/app
     ports:
-      - 50708:50708
+      - <YOUR_DESIRED_PORT>:50708
     restart: unless-stopped
