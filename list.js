@@ -48,15 +48,18 @@ function sendMailingListError(list, message) {
     `;
 
     const mailgun = initMailgun(message.domain);
-    mailgun.messages().send({
+    const options = {
         from: `bouncebot@${message.domain}`,
         to: message.From,
-        cc: _.get(CONFIG, ['services', 'bounce', 'cc'], ''),
-        bcc: _.get(CONFIG, ['services', 'bounce', 'bcc'], ''),
         subject: `Delivery Failure: ${message.subject}`,
         text: stripHtml(failureMessage),
         html: failureMessage,
-    });
+    };
+    const cc = _.get(CONFIG, ['services', 'bounce', 'cc']);
+    if (cc) { options.cc = cc; }
+    const bcc = _.get(CONFIG, ['services', 'bounce', 'bcc']);
+    if (bcc) { options.bcc = bcc; }
+    mailgun.messages().send(options);
 }
 
 const parser = bodyParser.urlencoded({extended: false});

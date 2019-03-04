@@ -71,16 +71,19 @@ module.exports.processWebhook = (request) => {
                 </blockquote>
             `;
             const mailgun = initMailgun(origin);
-            mailgun.messages().send({
+            const options = {
                 'h:In-Reply-To': messageId,
                 from: `bouncebot@${origin}`,
                 to: sender,
-                cc: _.get(CONFIG, ['services', 'bounce', 'cc'], ''),
-                bcc: _.get(CONFIG, ['services', 'bounce', 'bcc'], ''),
                 subject: `Re: ${subject}`,
                 html: failureMessage,
                 text: stripHtml(failureMessage),
-            });
+            };
+            const cc = _.get(CONFIG, ['services', 'bounce', 'cc']);
+            if (cc) { options.cc = cc; }
+            const bcc = _.get(CONFIG, ['services', 'bounce', 'bcc']);
+            if (bcc) { options.bcc = bcc; }
+            mailgun.messages().send(options);
         }
         else {
             console.warn(`Ignoring bounce from ${sender} to ${recipient} because ${origin} is not a managed domain`);
