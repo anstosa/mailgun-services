@@ -1,5 +1,23 @@
 # Mailgun Bouncebot
 
+> **Archive notice · Historical / unmaintained.** This project is preserved as a record of earlier engineering work. It is not receiving active compatibility or security updates. Instructions and third-party integrations reflect the project's original era; verify them independently before running the code.
+
+## Retrospective
+
+### The problem and product
+
+A small webhook service that turns Mailgun permanent-delivery failures into sender-facing bounce notifications, restoring feedback users expect when sending mail through a hosted client.
+
+### Engineering approach
+
+Exposing a dedicated `/bounce` endpoint let the service receive Mailgun webhooks per domain while remaining independently deployable with Docker. Environment-based configuration and reverse-proxy TLS guidance reflect the operational realities of receiving delivery metadata from a third party.
+
+### Takeaways and limitations
+
+The useful product insight was that delivery failures are a user-experience problem, not just a provider log entry. The historical README documents deployment assumptions from 2019; it does not establish current Mailgun API compatibility, webhook-signature validation, or production security posture.
+
+## Original documentation
+
 When using a hosted email client like Gmail to send messages, if a message fails to be delivered, the sender gets a reply to the conversation indicating that delivery has failed.
 
 This lightweight service provides the same functionality if you use Mailgun for your outgoing email.
